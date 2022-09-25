@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.1/dist/css/bootstrap.min.css">
+    <title>XO</title>
+
+    <style>
+        .grid-container {
+            height: 80vh;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 1fr 1fr 1fr;
+        }
+
+        .cell {
+            background-color: rgb(167 231 231);
+            border: 1px solid #959595;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 130px;
+            padding: 0;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .heading-border {
+            position: absolute;
+            display: inline-block;
+            background: #bed2ff;
+            height: 2px;
+            bottom: 0;
+            left: 38%;
+            right: 38%;
+        }
+
+        .payler {
+            width: 40%;
+            background: #5e5fde;
+            color: #EEE;
+            text-align: center;
+            padding: 14px;
+            margin-bottom: 20px;
+            border-radius: 13px;
+            display: inline-block;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="MainMenu" class="row justify-content-center mt-5 pt-5">
+        <div class="w-100"></div>
+
+        <div class="col-6 text-center">
+            <div style="position: relative">
+                <h1 class="mb-5 ">XO Game</h1>
+                <span class="heading-border"></span>
+            </div>
+
+            <div class="row">
+                <div class="col-8">
+                    <input type="text" class="form-control" id="gameId">
+                </div>
+                <div class="col-4">
+                    <button id="JoinBtn" class="btn btn-secondary">Join</button>
+                    <button id="CreateBtn" class="btn btn-primary">Create</button>
+                </div>
+            </div>
+            <!-- <hr> -->
+        </div>
+    </div>
+    <div id="Game" style="opacity: 0" class="row  justify-content-center mt-5 pt-5">
+        <div class="col-6 d-flex justify-content-around" id="divPlayers">
+        </div>
+        <div class="w-100"></div>
+        <div class="col-6">
+            <div class="grid-container">
+                <div class="grid-item cell"></div>
+                <div class="grid-item cell"></div>
+                <div class="grid-item cell"></div>
+                <div class="grid-item cell"></div>
+                <div class="grid-item cell"></div>
+                <div class="grid-item cell"></div>
+                <div class="grid-item cell"></div>
+                <div class="grid-item cell"></div>
+                <div class="grid-item cell"></div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.1/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        let symbol = 'o';
+        let myTurn = true;
+        let btnCreate = document.getElementById('CreateBtn')
+        let btnJoin = document.getElementById('JoinBtn')
+        let InputJoin = document.getElementById('gameId')
+        let MainMenu = document.getElementById('MainMenu')
+        let GameDiv = document.getElementById('Game')
+        let divPlayers = document.getElementById('divPlayers')
+        let clientId = null
+        let gameId = null
+        ws = new WebSocket('ws://localhost:9090')
+
+
+        cells = document.querySelectorAll('.cell');
+        cells.forEach(item => {
+            item.addEventListener('click', e => {
+                if (item.innerHTML === '' && myTurn)
+                    item.innerHTML = symbol
+
+                myTurn = false
+            })
+        })
+
+
+
+        btnCreate.addEventListener('click', e => {
+            ws.send(JSON.stringify({
+                "method": "create",
+            }))
+        })
+
+        btnJoin.addEventListener('click', e => {
+            ws.send(JSON.stringify({
+                "method": "join",
+                "clientId": clientId,
+                "gameId": InputJoin.value
+            }))
+        })
+
+
+        ws.onmessage = message => {
+            const response = JSON.parse(message.data)
+   
+
+            if (response.method === "connect") {
+                clientId = response.client
+            }
+            
+            if (response.method === "create") {
+                InputJoin.value = response.game.id
+            }
+
+            
+         
+
+            if(response.method === "join"){
+                while (divPlayers.firstChild)
+                    divPlayers.removeChild(divPlayers.firstChild)
+
+
+                MainMenu.style.display = 'none'
+                GameDiv.style.opacity = 1
+
+                console.log(response)
+                response.game.clients.forEach(client => {
+                    const paylerDiv = document.createElement('div')
+                    paylerDiv.classList.add('payler');
+                    paylerDiv.innerHTML = symbol
+                    document.getElementById('divPlayers').appendChild(paylerDiv)
+
+                   if(client.clientId == clientId)
+                        symbol = client.symbol;
+                });
+                
+            }
+        }
+    </script>
+</body>
+
+</html>
