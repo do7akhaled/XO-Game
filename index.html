@@ -53,49 +53,55 @@
 
 <body>
 
-    <div id="MainMenu" class="row justify-content-center mt-5 pt-5">
-        <div class="w-100"></div>
+    <div class="container">
+        <div id="MainMenu" class="row justify-content-center mt-5 pt-5">
+            <div class="w-100"></div>
 
-        <div class="col-6 text-center">
-            <div style="position: relative">
-                <h1 class="mb-5 ">XO Game</h1>
-                <span class="heading-border"></span>
-            </div>
+            <div class="col-6 text-center">
+                <div style="position: relative">
+                    <h1 class="mb-5 ">XO Game</h1>
+                    <span class="heading-border"></span>
+                </div>
 
-            <div class="row">
-                <div class="col-8">
-                    <input type="text" class="form-control" id="gameId">
+                <div class="row">
+                    <div class="col-8">
+                        <input type="text" class="form-control" id="gameId">
+                    </div>
+                    <div class="col-4">
+                        <button id="JoinBtn" class="btn btn-secondary">Join</button>
+                        <button id="CreateBtn" class="btn btn-primary">Create</button>
+                    </div>
                 </div>
-                <div class="col-4">
-                    <button id="JoinBtn" class="btn btn-secondary">Join</button>
-                    <button id="CreateBtn" class="btn btn-primary">Create</button>
+                <!-- <hr> -->
+            </div>
+        </div>
+        <div id="Game" style="display: none;" class="row  justify-content-center  pt-5">
+            <div class="col-6 d-flex justify-content-around" id="divPlayers">
+            </div>
+            <div class="w-100"></div>
+            <div class="col-6">
+                <div class="grid-container" style="position: relative">
+                    <button id="1" class="grid-item cell"></button>
+                    <button id="2" class="grid-item cell"></button>
+                    <button id="3" class="grid-item cell"></button>
+                    <button id="4" class="grid-item cell"></button>
+                    <button id="5" class="grid-item cell"></button>
+                    <button id="6" class="grid-item cell"></button>
+                    <button id="7" class="grid-item cell"></button>
+                    <button id="8" class="grid-item cell"></button>
+                    <button id="9" class="grid-item cell"></button>
                 </div>
             </div>
-            <!-- <hr> -->
         </div>
     </div>
-    <div id="Game" style="opacity: 0" class="row  justify-content-center mt-5 pt-5">
-        <div class="col-6 d-flex justify-content-around" id="divPlayers">
-        </div>
-        <div class="w-100"></div>
-        <div class="col-6">
-            <div class="grid-container">
-                <div class="grid-item cell"></div>
-                <div class="grid-item cell"></div>
-                <div class="grid-item cell"></div>
-                <div class="grid-item cell"></div>
-                <div class="grid-item cell"></div>
-                <div class="grid-item cell"></div>
-                <div class="grid-item cell"></div>
-                <div class="grid-item cell"></div>
-                <div class="grid-item cell"></div>
-            </div>
-        </div>
-    </div>
+
+    
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.1/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        let symbol = 'o';
+
+
+        let symbol = null;
         let myTurn = true;
         let btnCreate = document.getElementById('CreateBtn')
         let btnJoin = document.getElementById('JoinBtn')
@@ -110,11 +116,22 @@
 
         cells = document.querySelectorAll('.cell');
         cells.forEach(item => {
+            
             item.addEventListener('click', e => {
-                if (item.innerHTML === '' && myTurn)
+                if (item.innerHTML === '' && myTurn) {
                     item.innerHTML = symbol
+                    ws.send(JSON.stringify({
+                        'method': 'play',
+                        'clientId': clientId,
+                        'gameId': gameId,
+                        'symbol': symbol,
+                        'cellId': item.getAttribute('id')
+                    }))
+                    myTurn = false
+                }
 
-                myTurn = false
+
+
             })
         })
 
@@ -127,48 +144,81 @@
         })
 
         btnJoin.addEventListener('click', e => {
-            ws.send(JSON.stringify({
-                "method": "join",
-                "clientId": clientId,
-                "gameId": InputJoin.value
-            }))
+            if (InputJoin.value) {
+                ws.send(JSON.stringify({
+                    "method": "join",
+                    "clientId": clientId,
+                    "gameId": InputJoin.value
+                }))
+            }
+
         })
 
 
         ws.onmessage = message => {
             const response = JSON.parse(message.data)
-   
+
 
             if (response.method === "connect") {
                 clientId = response.client
             }
-            
+
             if (response.method === "create") {
                 InputJoin.value = response.game.id
             }
 
-            
-         
 
-            if(response.method === "join"){
+
+
+            if (response.method === "join") {
                 while (divPlayers.firstChild)
                     divPlayers.removeChild(divPlayers.firstChild)
 
 
                 MainMenu.style.display = 'none'
-                GameDiv.style.opacity = 1
+                GameDiv.style.display = 'flex'
 
-                console.log(response)
+                gameId = response.game.id
+
                 response.game.clients.forEach(client => {
-                    const paylerDiv = document.createElement('div')
-                    paylerDiv.classList.add('payler');
-                    paylerDiv.innerHTML = symbol
-                    document.getElementById('divPlayers').appendChild(paylerDiv)
+                    const score = document.createElement('span')
+                    score.id = client.symbol + "-score"
+                    console.log(score)
+                    score.innerHTML = '(0)'
+                    const playerDiv = document.createElement('div')
+                    playerDiv.classList.add('payler');
+    
+                    playerDiv.innerHTML = client.symbol
+                    playerDiv.appendChild(score)
+                    document.getElementById('divPlayers').appendChild(playerDiv)
 
-                   if(client.clientId == clientId)
+                    if (client.clientId == clientId) {
                         symbol = client.symbol;
+                        myTurn = symbol === "X"
+                    }
+
                 });
-                
+
+            }
+
+
+            if (response.method === 'update') {
+               for(let id of Object.keys(response.game.state)){
+                    document.getElementById(id).innerHTML = response.game.state[id]
+                }
+
+                if(response.winner){
+        
+                    alert("the winner is " + response.winner)
+                    score = document.getElementById(response.winner + '-score')
+                    score.innerHTML =  "(" + (+(score.innerHTML.replace(/\(/, '').replace(/\)/, '')) + 1) + ")";
+                    cells = document.querySelectorAll('.cell');
+                    cells.forEach(item => {
+                        item.innerHTML = ''
+                    })
+                }
+
+                myTurn = response.game.turn == symbol
             }
         }
     </script>

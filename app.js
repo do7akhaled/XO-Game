@@ -41,7 +41,10 @@ wsServer.on('request', request => {
     connection.on('message', request => {
         const message = JSON.parse(request.utf8Data)
         let {method, ...NewMessage} = message
-        connection.send(JSON.stringify(mapReqest(method, NewMessage)))
+
+        result = mapReqest(method, NewMessage);
+        if(!!result)
+            connection.send(JSON.stringify(result))
 
     })
 })
@@ -50,6 +53,7 @@ wsServer.on('request', request => {
 const actions = {
     "create": CreateGame,
     "join" : JoinGame,
+    "play" : PlayGame
 }
 
 
@@ -82,16 +86,18 @@ function JoinGame(data) {
 
 
 function PlayGame(data) {
-    const clientId = data.clientId
     const gameId = data.gameId
     const cellId = data.cellId
-    
+    const symbol = data.symbol
+
+
     let state = games[gameId].state
 
-    state[cellId] = clientId
+    state[cellId] = symbol
     games[gameId].state = state
+    games[gameId].turn = symbol == "X" ? "O" : "X"
 
-    updateGameState()
+    updateGameState(gameId)
 }
 
 function CreateGame() {
@@ -100,7 +106,8 @@ function CreateGame() {
     games[gameId] = {
         "id": gameId,
         "clients": [],
-        "state": {}
+        "state": {},
+        "turn": 'X'
     }
 
     return {
@@ -113,19 +120,72 @@ function CreateGame() {
 
 
 
-function updateGameState() {
-    for (const g of Object.keys(games)) {
-
-        const payLoad = {
-            "method": "update",
-            "game": games[g]
-        }
-
-        games[g].clients.forEach(c => {
-            clients[c.clientId].connection.send(JSON.stringify(payLoad))
-        })
+function updateGameState(gameId) {
+    let winner = checkWinner(gameId);
+    const payLoad = {
+        "method": "update",
+        "game": games[gameId],
+        ...winner
     }
+
+    games[gameId].clients.forEach(c => {
+        clients[c.clientId].connection.send(JSON.stringify(payLoad))
+    })
+
+
+
+    if(winner.winner)
+    {
+        resetGameState(gameId);
+    }
+
 }
 function guid() {
     return Math.floor(Math.random() * 100000);
 }
+
+
+let winningPatterns = [
+    [1,2,3],
+    [4,5,6],
+    [7,8,9],
+    [1,4,7],
+    [2,5,8],
+    [3,6,9],
+    [1,5,9],
+    [3,5,7],
+]
+
+function checkWinner(gameId)
+{
+    let game = games[gameId]
+    let winning = false
+    let winnerObj = {};
+    winningPatterns.forEach(pattern => {
+        if(winning == false)
+        {
+            winning = game.state[pattern[0]] == game.state[pattern[1]] && game.state[pattern[0]] == game.state[pattern[2]]
+
+            if(winning)
+            {
+                //symbol of winner
+                winnerObj =  {
+                    "winner" : game.state[pattern[0]],
+                    "pattern": pattern
+                }
+            }
+        }
+
+    });
+
+    return winnerObj;
+    
+}
+
+
+function resetGameState(gameId)
+{
+    games[gameId].state = {} 
+}
+
+
